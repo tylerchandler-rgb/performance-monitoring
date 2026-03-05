@@ -1,5 +1,6 @@
--- USA Cohorted Ward Earning & Redemption Rates
--- Cohort:      US users grouped by signup date (DATE(signup_at))
+-- Daily Cohort Monitoring — Earning & Redemption Rates by Platform x Country
+-- Cohort:      All users grouped by signup date (DATE(signup_at)), last 90 days
+-- Segments:    platform_group x country_splitter (US vs Rest of World)
 -- Earning:     wards accumulated from customer_cost (amount_ward > 0 only)
 -- Redemption:  monetary ward cashouts from fct_cashout (cost_eur < 0)
 -- Maturity:    window columns are NULL when the cohort has not yet aged past the window boundary
@@ -14,9 +15,12 @@ WITH cohort_users AS (
       WHEN platform IS NULL                 THEN 'Missing'
       ELSE 'Other'
     END AS platform_group
+    ,CASE
+      WHEN country = 'US' THEN 'US'
+      ELSE 'ROW'
+    END AS country_splitter
   FROM `weward-1548152103232.silver.customer_data`
-  WHERE country = 'US'
-    AND DATE(signup_at) >= DATE('2024-01-01')
+  WHERE DATE(signup_at) >= CURRENT_DATE - 90
     AND DATE(signup_at) < CURRENT_DATE
 )
 
@@ -144,6 +148,149 @@ WITH cohort_users AS (
   GROUP BY 1
 )
 
+,user_cashouts AS (
+  SELECT
+    a.customer_id
+    -- ===== D0–D6 (delivered) =====
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 0  AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_d0
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 0  AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_d0
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 1  AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_d1
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 1  AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_d1
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 2  AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_d2
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 2  AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_d2
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 3  AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_d3
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 3  AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_d3
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 4  AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_d4
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 4  AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_d4
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 5  AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_d5
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 5  AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_d5
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6  AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_d6
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6  AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_d6
+    -- ===== D0–D6 (declined) =====
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 0  AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_d0
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 0  AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_d0
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 1  AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_d1
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 1  AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_d1
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 2  AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_d2
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 2  AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_d2
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 3  AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_d3
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 3  AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_d3
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 4  AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_d4
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 4  AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_d4
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 5  AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_d5
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 5  AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_d5
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6  AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_d6
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6  AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_d6
+    -- ===== D0–D6 (pending) =====
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 0  AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_d0
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 0  AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_d0
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 1  AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_d1
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 1  AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_d1
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 2  AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_d2
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 2  AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_d2
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 3  AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_d3
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 3  AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_d3
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 4  AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_d4
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 4  AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_d4
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 5  AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_d5
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 5  AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_d5
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6  AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_d6
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6  AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_d6
+    -- ===== D0–D6 (failed) =====
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 0  AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_d0
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 0  AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_d0
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 1  AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_d1
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 1  AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_d1
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 2  AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_d2
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 2  AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_d2
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 3  AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_d3
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 3  AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_d3
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 4  AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_d4
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 4  AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_d4
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 5  AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_d5
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 5  AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_d5
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6  AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_d6
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6  AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_d6
+    -- ===== D0–D6 (refunded) =====
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 0  AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_d0
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 0  AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_d0
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 1  AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_d1
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 1  AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_d1
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 2  AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_d2
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 2  AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_d2
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 3  AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_d3
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 3  AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_d3
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 4  AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_d4
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 4  AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_d4
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 5  AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_d5
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 5  AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_d5
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6  AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_d6
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6  AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_d6
+    -- ===== W0–W4 (delivered) =====
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6   AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_w0
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6   AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_w0
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 13  AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_w1
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 13  AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_w1
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 20  AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_w2
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 20  AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_w2
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 27  AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_w3
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 27  AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_w3
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 34  AND b.status = 'delivered' THEN b.price ELSE NULL END) AS cashout_delivered_wards_w4
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 34  AND b.status = 'delivered' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_delivered_users_w4
+    -- ===== W0–W4 (declined) =====
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6   AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_w0
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6   AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_w0
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 13  AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_w1
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 13  AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_w1
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 20  AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_w2
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 20  AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_w2
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 27  AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_w3
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 27  AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_w3
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 34  AND b.status = 'declined' THEN b.price ELSE NULL END) AS cashout_declined_wards_w4
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 34  AND b.status = 'declined' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_declined_users_w4
+    -- ===== W0–W4 (pending) =====
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6   AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_w0
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6   AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_w0
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 13  AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_w1
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 13  AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_w1
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 20  AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_w2
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 20  AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_w2
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 27  AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_w3
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 27  AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_w3
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 34  AND b.status = 'pending' THEN b.price ELSE NULL END) AS cashout_pending_wards_w4
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 34  AND b.status = 'pending' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_pending_users_w4
+    -- ===== W0–W4 (failed) =====
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6   AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_w0
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6   AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_w0
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 13  AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_w1
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 13  AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_w1
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 20  AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_w2
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 20  AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_w2
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 27  AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_w3
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 27  AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_w3
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 34  AND b.status = 'failed' THEN b.price ELSE NULL END) AS cashout_failed_wards_w4
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 34  AND b.status = 'failed' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_failed_users_w4
+    -- ===== W0–W4 (refunded) =====
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6   AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_w0
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 6   AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_w0
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 13  AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_w1
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 13  AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_w1
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 20  AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_w2
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 20  AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_w2
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 27  AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_w3
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 27  AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_w3
+    ,SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 34  AND b.status = 'refunded' THEN b.price ELSE NULL END) AS cashout_refunded_wards_w4
+    ,IF(SUM(CASE WHEN DATE_DIFF(DATE(b.created_at), a.cohort_date, DAY) BETWEEN 0 AND 34  AND b.status = 'refunded' THEN 1 ELSE 0 END) > 0, 1, 0) AS cashout_refunded_users_w4
+  FROM cohort_users AS a
+  LEFT JOIN `696845466639.raw_data.store_order` AS b
+    ON a.customer_id = b.customer_id
+    AND DATE(b.created_at) >= a.cohort_date
+    AND DATE(b.created_at) >= CURRENT_DATE - 90
+    AND DATE(b.created_at) < CURRENT_DATE
+    AND b.transfer_id IS NOT NULL
+  GROUP BY 1
+)
+
 ,suspicious_users AS (
   SELECT customer_id
   FROM (
@@ -173,6 +320,7 @@ WITH cohort_users AS (
 
 SELECT
   c.cohort_date
+  ,c.country_splitter
   ,c.platform_group
   ,COUNT(DISTINCT c.customer_id)                                     AS cohort_size
   ,DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY)  AS days_since_cohort
@@ -421,11 +569,152 @@ SELECT
   ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 35
     THEN SAFE_DIVIDE(SUM(e.earners_1000_w4), COUNT(DISTINCT c.customer_id)) ELSE NULL END AS earners_1000_rate_w4
 
+  -- ===== D0–D6: Cashout — delivered =====
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 0  THEN SUM(co.cashout_delivered_wards_d0) ELSE NULL END AS cashout_delivered_wards_d0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 0  THEN SUM(co.cashout_delivered_users_d0) ELSE NULL END AS cashout_delivered_users_d0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 1  THEN SUM(co.cashout_delivered_wards_d1) ELSE NULL END AS cashout_delivered_wards_d1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 1  THEN SUM(co.cashout_delivered_users_d1) ELSE NULL END AS cashout_delivered_users_d1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 2  THEN SUM(co.cashout_delivered_wards_d2) ELSE NULL END AS cashout_delivered_wards_d2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 2  THEN SUM(co.cashout_delivered_users_d2) ELSE NULL END AS cashout_delivered_users_d2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 3  THEN SUM(co.cashout_delivered_wards_d3) ELSE NULL END AS cashout_delivered_wards_d3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 3  THEN SUM(co.cashout_delivered_users_d3) ELSE NULL END AS cashout_delivered_users_d3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 4  THEN SUM(co.cashout_delivered_wards_d4) ELSE NULL END AS cashout_delivered_wards_d4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 4  THEN SUM(co.cashout_delivered_users_d4) ELSE NULL END AS cashout_delivered_users_d4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 5  THEN SUM(co.cashout_delivered_wards_d5) ELSE NULL END AS cashout_delivered_wards_d5
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 5  THEN SUM(co.cashout_delivered_users_d5) ELSE NULL END AS cashout_delivered_users_d5
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 6  THEN SUM(co.cashout_delivered_wards_d6) ELSE NULL END AS cashout_delivered_wards_d6
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 6  THEN SUM(co.cashout_delivered_users_d6) ELSE NULL END AS cashout_delivered_users_d6
+
+  -- ===== D0–D6: Cashout — declined =====
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 0  THEN SUM(co.cashout_declined_wards_d0) ELSE NULL END AS cashout_declined_wards_d0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 0  THEN SUM(co.cashout_declined_users_d0) ELSE NULL END AS cashout_declined_users_d0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 1  THEN SUM(co.cashout_declined_wards_d1) ELSE NULL END AS cashout_declined_wards_d1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 1  THEN SUM(co.cashout_declined_users_d1) ELSE NULL END AS cashout_declined_users_d1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 2  THEN SUM(co.cashout_declined_wards_d2) ELSE NULL END AS cashout_declined_wards_d2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 2  THEN SUM(co.cashout_declined_users_d2) ELSE NULL END AS cashout_declined_users_d2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 3  THEN SUM(co.cashout_declined_wards_d3) ELSE NULL END AS cashout_declined_wards_d3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 3  THEN SUM(co.cashout_declined_users_d3) ELSE NULL END AS cashout_declined_users_d3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 4  THEN SUM(co.cashout_declined_wards_d4) ELSE NULL END AS cashout_declined_wards_d4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 4  THEN SUM(co.cashout_declined_users_d4) ELSE NULL END AS cashout_declined_users_d4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 5  THEN SUM(co.cashout_declined_wards_d5) ELSE NULL END AS cashout_declined_wards_d5
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 5  THEN SUM(co.cashout_declined_users_d5) ELSE NULL END AS cashout_declined_users_d5
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 6  THEN SUM(co.cashout_declined_wards_d6) ELSE NULL END AS cashout_declined_wards_d6
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 6  THEN SUM(co.cashout_declined_users_d6) ELSE NULL END AS cashout_declined_users_d6
+
+  -- ===== D0–D6: Cashout — pending =====
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 0  THEN SUM(co.cashout_pending_wards_d0) ELSE NULL END AS cashout_pending_wards_d0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 0  THEN SUM(co.cashout_pending_users_d0) ELSE NULL END AS cashout_pending_users_d0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 1  THEN SUM(co.cashout_pending_wards_d1) ELSE NULL END AS cashout_pending_wards_d1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 1  THEN SUM(co.cashout_pending_users_d1) ELSE NULL END AS cashout_pending_users_d1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 2  THEN SUM(co.cashout_pending_wards_d2) ELSE NULL END AS cashout_pending_wards_d2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 2  THEN SUM(co.cashout_pending_users_d2) ELSE NULL END AS cashout_pending_users_d2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 3  THEN SUM(co.cashout_pending_wards_d3) ELSE NULL END AS cashout_pending_wards_d3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 3  THEN SUM(co.cashout_pending_users_d3) ELSE NULL END AS cashout_pending_users_d3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 4  THEN SUM(co.cashout_pending_wards_d4) ELSE NULL END AS cashout_pending_wards_d4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 4  THEN SUM(co.cashout_pending_users_d4) ELSE NULL END AS cashout_pending_users_d4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 5  THEN SUM(co.cashout_pending_wards_d5) ELSE NULL END AS cashout_pending_wards_d5
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 5  THEN SUM(co.cashout_pending_users_d5) ELSE NULL END AS cashout_pending_users_d5
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 6  THEN SUM(co.cashout_pending_wards_d6) ELSE NULL END AS cashout_pending_wards_d6
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 6  THEN SUM(co.cashout_pending_users_d6) ELSE NULL END AS cashout_pending_users_d6
+
+  -- ===== D0–D6: Cashout — failed =====
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 0  THEN SUM(co.cashout_failed_wards_d0) ELSE NULL END AS cashout_failed_wards_d0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 0  THEN SUM(co.cashout_failed_users_d0) ELSE NULL END AS cashout_failed_users_d0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 1  THEN SUM(co.cashout_failed_wards_d1) ELSE NULL END AS cashout_failed_wards_d1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 1  THEN SUM(co.cashout_failed_users_d1) ELSE NULL END AS cashout_failed_users_d1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 2  THEN SUM(co.cashout_failed_wards_d2) ELSE NULL END AS cashout_failed_wards_d2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 2  THEN SUM(co.cashout_failed_users_d2) ELSE NULL END AS cashout_failed_users_d2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 3  THEN SUM(co.cashout_failed_wards_d3) ELSE NULL END AS cashout_failed_wards_d3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 3  THEN SUM(co.cashout_failed_users_d3) ELSE NULL END AS cashout_failed_users_d3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 4  THEN SUM(co.cashout_failed_wards_d4) ELSE NULL END AS cashout_failed_wards_d4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 4  THEN SUM(co.cashout_failed_users_d4) ELSE NULL END AS cashout_failed_users_d4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 5  THEN SUM(co.cashout_failed_wards_d5) ELSE NULL END AS cashout_failed_wards_d5
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 5  THEN SUM(co.cashout_failed_users_d5) ELSE NULL END AS cashout_failed_users_d5
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 6  THEN SUM(co.cashout_failed_wards_d6) ELSE NULL END AS cashout_failed_wards_d6
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 6  THEN SUM(co.cashout_failed_users_d6) ELSE NULL END AS cashout_failed_users_d6
+
+  -- ===== D0–D6: Cashout — refunded =====
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 0  THEN SUM(co.cashout_refunded_wards_d0) ELSE NULL END AS cashout_refunded_wards_d0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 0  THEN SUM(co.cashout_refunded_users_d0) ELSE NULL END AS cashout_refunded_users_d0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 1  THEN SUM(co.cashout_refunded_wards_d1) ELSE NULL END AS cashout_refunded_wards_d1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 1  THEN SUM(co.cashout_refunded_users_d1) ELSE NULL END AS cashout_refunded_users_d1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 2  THEN SUM(co.cashout_refunded_wards_d2) ELSE NULL END AS cashout_refunded_wards_d2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 2  THEN SUM(co.cashout_refunded_users_d2) ELSE NULL END AS cashout_refunded_users_d2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 3  THEN SUM(co.cashout_refunded_wards_d3) ELSE NULL END AS cashout_refunded_wards_d3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 3  THEN SUM(co.cashout_refunded_users_d3) ELSE NULL END AS cashout_refunded_users_d3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 4  THEN SUM(co.cashout_refunded_wards_d4) ELSE NULL END AS cashout_refunded_wards_d4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 4  THEN SUM(co.cashout_refunded_users_d4) ELSE NULL END AS cashout_refunded_users_d4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 5  THEN SUM(co.cashout_refunded_wards_d5) ELSE NULL END AS cashout_refunded_wards_d5
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 5  THEN SUM(co.cashout_refunded_users_d5) ELSE NULL END AS cashout_refunded_users_d5
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 6  THEN SUM(co.cashout_refunded_wards_d6) ELSE NULL END AS cashout_refunded_wards_d6
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 6  THEN SUM(co.cashout_refunded_users_d6) ELSE NULL END AS cashout_refunded_users_d6
+
+  -- ===== W0–W4: Cashout — delivered =====
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 7  THEN SUM(co.cashout_delivered_wards_w0) ELSE NULL END AS cashout_delivered_wards_w0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 7  THEN SUM(co.cashout_delivered_users_w0) ELSE NULL END AS cashout_delivered_users_w0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 14 THEN SUM(co.cashout_delivered_wards_w1) ELSE NULL END AS cashout_delivered_wards_w1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 14 THEN SUM(co.cashout_delivered_users_w1) ELSE NULL END AS cashout_delivered_users_w1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 21 THEN SUM(co.cashout_delivered_wards_w2) ELSE NULL END AS cashout_delivered_wards_w2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 21 THEN SUM(co.cashout_delivered_users_w2) ELSE NULL END AS cashout_delivered_users_w2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 28 THEN SUM(co.cashout_delivered_wards_w3) ELSE NULL END AS cashout_delivered_wards_w3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 28 THEN SUM(co.cashout_delivered_users_w3) ELSE NULL END AS cashout_delivered_users_w3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 35 THEN SUM(co.cashout_delivered_wards_w4) ELSE NULL END AS cashout_delivered_wards_w4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 35 THEN SUM(co.cashout_delivered_users_w4) ELSE NULL END AS cashout_delivered_users_w4
+
+  -- ===== W0–W4: Cashout — declined =====
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 7  THEN SUM(co.cashout_declined_wards_w0) ELSE NULL END AS cashout_declined_wards_w0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 7  THEN SUM(co.cashout_declined_users_w0) ELSE NULL END AS cashout_declined_users_w0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 14 THEN SUM(co.cashout_declined_wards_w1) ELSE NULL END AS cashout_declined_wards_w1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 14 THEN SUM(co.cashout_declined_users_w1) ELSE NULL END AS cashout_declined_users_w1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 21 THEN SUM(co.cashout_declined_wards_w2) ELSE NULL END AS cashout_declined_wards_w2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 21 THEN SUM(co.cashout_declined_users_w2) ELSE NULL END AS cashout_declined_users_w2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 28 THEN SUM(co.cashout_declined_wards_w3) ELSE NULL END AS cashout_declined_wards_w3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 28 THEN SUM(co.cashout_declined_users_w3) ELSE NULL END AS cashout_declined_users_w3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 35 THEN SUM(co.cashout_declined_wards_w4) ELSE NULL END AS cashout_declined_wards_w4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 35 THEN SUM(co.cashout_declined_users_w4) ELSE NULL END AS cashout_declined_users_w4
+
+  -- ===== W0–W4: Cashout — pending =====
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 7  THEN SUM(co.cashout_pending_wards_w0) ELSE NULL END AS cashout_pending_wards_w0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 7  THEN SUM(co.cashout_pending_users_w0) ELSE NULL END AS cashout_pending_users_w0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 14 THEN SUM(co.cashout_pending_wards_w1) ELSE NULL END AS cashout_pending_wards_w1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 14 THEN SUM(co.cashout_pending_users_w1) ELSE NULL END AS cashout_pending_users_w1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 21 THEN SUM(co.cashout_pending_wards_w2) ELSE NULL END AS cashout_pending_wards_w2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 21 THEN SUM(co.cashout_pending_users_w2) ELSE NULL END AS cashout_pending_users_w2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 28 THEN SUM(co.cashout_pending_wards_w3) ELSE NULL END AS cashout_pending_wards_w3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 28 THEN SUM(co.cashout_pending_users_w3) ELSE NULL END AS cashout_pending_users_w3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 35 THEN SUM(co.cashout_pending_wards_w4) ELSE NULL END AS cashout_pending_wards_w4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 35 THEN SUM(co.cashout_pending_users_w4) ELSE NULL END AS cashout_pending_users_w4
+
+  -- ===== W0–W4: Cashout — failed =====
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 7  THEN SUM(co.cashout_failed_wards_w0) ELSE NULL END AS cashout_failed_wards_w0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 7  THEN SUM(co.cashout_failed_users_w0) ELSE NULL END AS cashout_failed_users_w0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 14 THEN SUM(co.cashout_failed_wards_w1) ELSE NULL END AS cashout_failed_wards_w1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 14 THEN SUM(co.cashout_failed_users_w1) ELSE NULL END AS cashout_failed_users_w1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 21 THEN SUM(co.cashout_failed_wards_w2) ELSE NULL END AS cashout_failed_wards_w2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 21 THEN SUM(co.cashout_failed_users_w2) ELSE NULL END AS cashout_failed_users_w2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 28 THEN SUM(co.cashout_failed_wards_w3) ELSE NULL END AS cashout_failed_wards_w3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 28 THEN SUM(co.cashout_failed_users_w3) ELSE NULL END AS cashout_failed_users_w3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 35 THEN SUM(co.cashout_failed_wards_w4) ELSE NULL END AS cashout_failed_wards_w4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 35 THEN SUM(co.cashout_failed_users_w4) ELSE NULL END AS cashout_failed_users_w4
+
+  -- ===== W0–W4: Cashout — refunded =====
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 7  THEN SUM(co.cashout_refunded_wards_w0) ELSE NULL END AS cashout_refunded_wards_w0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 7  THEN SUM(co.cashout_refunded_users_w0) ELSE NULL END AS cashout_refunded_users_w0
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 14 THEN SUM(co.cashout_refunded_wards_w1) ELSE NULL END AS cashout_refunded_wards_w1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 14 THEN SUM(co.cashout_refunded_users_w1) ELSE NULL END AS cashout_refunded_users_w1
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 21 THEN SUM(co.cashout_refunded_wards_w2) ELSE NULL END AS cashout_refunded_wards_w2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 21 THEN SUM(co.cashout_refunded_users_w2) ELSE NULL END AS cashout_refunded_users_w2
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 28 THEN SUM(co.cashout_refunded_wards_w3) ELSE NULL END AS cashout_refunded_wards_w3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 28 THEN SUM(co.cashout_refunded_users_w3) ELSE NULL END AS cashout_refunded_users_w3
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 35 THEN SUM(co.cashout_refunded_wards_w4) ELSE NULL END AS cashout_refunded_wards_w4
+  ,CASE WHEN DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY) >= 35 THEN SUM(co.cashout_refunded_users_w4) ELSE NULL END AS cashout_refunded_users_w4
+
 FROM cohort_users AS c
-LEFT JOIN user_redemptions AS r ON c.customer_id = r.customer_id
-LEFT JOIN user_earnings AS e    ON c.customer_id = e.customer_id
-WHERE c.cohort_date >= DATE('2025-03-01')
+LEFT JOIN user_redemptions AS r  ON c.customer_id = r.customer_id
+LEFT JOIN user_earnings AS e     ON c.customer_id = e.customer_id
+LEFT JOIN user_cashouts AS co    ON c.customer_id = co.customer_id
+WHERE c.cohort_date >= CURRENT_DATE - 90
 -- AND c.customer_id NOT IN (SELECT customer_id FROM suspicious_users)
 -- AND c.customer_id NOT IN (SELECT customer_id FROM referral_users)
-GROUP BY 1, 2
-ORDER BY 2, 1 DESC
+GROUP BY 1, 2, 3
+ORDER BY 3, 2, 1 DESC
