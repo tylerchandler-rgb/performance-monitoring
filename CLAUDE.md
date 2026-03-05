@@ -214,3 +214,36 @@
 - To get a user's total lifetime cashout, take their maximum `day_after_install` row (or filter to a specific day window)
 - Use `day_after_install` / `week_after_install` / `month_after_install` to compare cohorts at equivalent points in their lifecycle
 - Use `fct_cashout` (transaction-level) when you need non-cumulative daily cashout amounts
+
+
+## Table: `696845466639.raw_data.store_order`
+> Transaction-level log of all cashout requests submitted by users. Each row represents a single cashout order, tracking its status, the product requested, and outcome details including decline reasons and delivery confirmation.
+| Column | Type | Example Values | Description |
+|--------|------|----------------|-------------|
+| `id` | integer (PK) | `1725369`, `1750454` | Unique order identifier |
+| `customer_id` | integer (FK, nullable) | `77`, _(nullable)_ | User identifier — foreign key to `customer_data.customer_id`; nullable for some declined orders |
+| `product_id` | string | `bancario_15_eur`, `virement_20_eur`, `bancario_60_eur` | Product redeemed — follows `{payment_method}_{amount}_{currency}` naming convention |
+| `price` | integer | `3000`, `4400`, `12000` | Ward cost of the order |
+| `status` | string (enum) | `delivered`, `declined` | Outcome of the cashout request |
+| `created_at` | datetime | `6/17/2022, 20:32` | Timestamp when the order was submitted |
+| `updated_at` | datetime | `6/21/2022, 04:44` | Timestamp of last status update |
+| `delivery_date` | datetime (nullable) | `6/23/2022, 12:14`, _(nullable)_ | Timestamp when order was fulfilled — only populated for `delivered` orders |
+| `transaction_id` | integer (nullable) | `1,980,110,355`, _(nullable)_ | Payment transaction reference — only populated for `delivered` orders |
+| `transfer_id` | integer (nullable) | `913581`, _(nullable)_ | Transfer reference identifier — sparse |
+| `wardeal_id` | integer (nullable) | `77`, _(nullable)_ | Ward deal reference — sparse |
+| `actor` | integer | `246` | Internal actor/agent identifier — likely system or admin user processing the order |
+| `declined_reason` | string (nullable) | `user_is_cheating_ban`, _(nullable)_ | Reason for decline — only populated for `declined` orders |
+| `_airbyte_raw_id` | string (UUID) | `2573819c-18e5-4ff4-...` | Airbyte internal tracking ID — ignore for analysis |
+| `_airbyte_extracted_at` | datetime | `3/5/2026, 05:46` | Airbyte extraction timestamp — ignore for analysis |
+| `_airbyte_meta` | string (JSON) | `{"changes":[],"sync_id":6446}` | Airbyte sync metadata — ignore for analysis |
+| `_airbyte_generation_id` | integer | `246` | Airbyte generation identifier — ignore for analysis |
+
+### Notes
+- Primary grain: one row per `id` — unique per cashout order
+- `customer_id` is the join key to `weward-1548152103232.silver.customer_data`; filter out NULLs when joining
+- `status` enum: `delivered` = successfully paid out; `declined` = rejected
+- `delivery_date` and `transaction_id` are only populated when `status = 'delivered'`
+- `declined_reason` is only populated when `status = 'declined'`; `user_is_cheating_ban` indicates fraud/abuse
+- `product_id` naming convention: `{payment_method}_{eur_amount}_eur` — e.g. `bancario_15_eur` = bank transfer of €15
+- `price` is the ward cost in the ward economy — not directly EUR; divide by ward value to get EUR equivalent
+- Ignore all `_airbyte_*` columns — they are pipeline metadata, not business data
