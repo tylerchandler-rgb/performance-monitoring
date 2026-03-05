@@ -9,16 +9,19 @@ WITH cohort_users AS (
   SELECT
     customer_id
     ,DATE(signup_at) AS cohort_date
-    ,CASE
-      WHEN LOWER(platform) LIKE '%android%' THEN 'Android'
-      WHEN LOWER(platform) LIKE '%ios%'     THEN 'iOS'
-      WHEN platform IS NULL                 THEN 'Missing'
-      ELSE 'Other'
-    END AS platform_group
-    ,CASE
-      WHEN country = 'US' THEN 'US'
-      ELSE 'ROW'
-    END AS country_splitter
+    ,CONCAT(
+      CASE
+        WHEN LOWER(platform) LIKE '%android%' THEN 'Android'
+        WHEN LOWER(platform) LIKE '%ios%'     THEN 'iOS'
+        WHEN platform IS NULL                 THEN 'Missing'
+        ELSE 'Other'
+      END,
+      ' - ',
+      CASE
+        WHEN country = 'US' THEN 'US'
+        ELSE 'ROW'
+      END
+    ) AS platform_country
   FROM `weward-1548152103232.silver.customer_data`
   WHERE DATE(signup_at) >= CURRENT_DATE - 90
     AND DATE(signup_at) < CURRENT_DATE
@@ -320,8 +323,7 @@ WITH cohort_users AS (
 
 SELECT
   c.cohort_date
-  ,c.country_splitter
-  ,c.platform_group
+  ,c.platform_country
   ,COUNT(DISTINCT c.customer_id)                                     AS cohort_size
   ,DATE_DIFF(CURRENT_DATE, c.cohort_date, DAY)  AS days_since_cohort
 
@@ -716,5 +718,5 @@ LEFT JOIN user_cashouts AS co    ON c.customer_id = co.customer_id
 WHERE c.cohort_date >= CURRENT_DATE - 90
 -- AND c.customer_id NOT IN (SELECT customer_id FROM suspicious_users)
 -- AND c.customer_id NOT IN (SELECT customer_id FROM referral_users)
-GROUP BY 1, 2, 3
-ORDER BY 3, 2, 1 DESC
+GROUP BY 1, 2
+ORDER BY 2, 1 DESC
