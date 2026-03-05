@@ -224,7 +224,7 @@
 | `customer_id` | integer (FK, nullable) | `77`, _(nullable)_ | User identifier — foreign key to `customer_data.customer_id`; nullable for some declined orders |
 | `product_id` | string | `bancario_15_eur`, `virement_20_eur`, `bancario_60_eur` | Product redeemed — follows `{payment_method}_{amount}_{currency}` naming convention |
 | `price` | integer | `3000`, `4400`, `12000` | Ward cost of the redemption — in wards, not EUR |
-| `status` | string (enum) | `delivered`, `declined` | Outcome of the redemption request |
+| `status` | string (enum) | `delivered`, `declined`, `pending`, `failed`, `refunded` | Outcome of the redemption request |
 | `created_at` | datetime | `6/17/2022, 20:32` | Timestamp when the order was submitted |
 | `updated_at` | datetime | `6/21/2022, 04:44` | Timestamp of last status update |
 | `delivery_date` | datetime (nullable) | `6/23/2022, 12:14`, _(nullable)_ | Timestamp when order was fulfilled — only populated for `delivered` orders |
@@ -241,7 +241,7 @@
 ### Notes
 - Primary grain: one row per `id` — unique per cashout order
 - `customer_id` is the join key to `weward-1548152103232.silver.customer_data`; filter out NULLs when joining
-- `status` enum: `delivered` = successfully fulfilled; `declined` = rejected
+- `status` enum: `delivered` = successfully fulfilled; `declined` = rejected before processing; `pending` = awaiting processing; `failed` = processing attempted but failed; `refunded` = fulfilled then reversed
 - `delivery_date` and `transaction_id` are only populated when `status = 'delivered'`
 - `declined_reason` is only populated when `status = 'declined'`; `user_is_cheating_ban` indicates fraud/abuse
 - `product_id` naming convention: `{payment_method}_{eur_amount}_eur` — e.g. `bancario_15_eur` = bank transfer of €15, `virement_20_eur` = wire transfer of €20
